@@ -4,31 +4,7 @@
 #define _GNU_SOURCE
 
 #include <stdio.h>
-#include <sys/resource.h>
-#include <sched.h>
-#include <unistd.h>
-#include <time.h>
-
-void print_system_usage() {
-    struct rusage usage;
-    int success = getrusage(RUSAGE_SELF, &usage);
-
-    if (success == 0) {
-        long user_time_ms = usage.ru_utime.tv_usec;
-        long user_time_s = usage.ru_utime.tv_sec;
-        long system_time_ms = usage.ru_stime.tv_usec;
-        long system_time_s = usage.ru_stime.tv_sec;
-        long involuntary_context_switches = usage.ru_nivcsw;
-        long voluntary_context_switches = usage.ru_nvcsw;
-
-        printf("Statics -> User time: %li seconds and %li microseconds, system time: %li seconds and %li microseconds, involuntary context switches: %li, voluntary context switches: %li\n",
-               user_time_s, user_time_ms, system_time_s, system_time_ms, involuntary_context_switches,
-               voluntary_context_switches);
-
-    } else {
-        printf("Error on retrieve statics \n");
-    }
-}
+#include "lib_core_performance_test.h"
 
 long compute_something(long iteration_number) {
     long number_to_multiply = 3;
@@ -43,38 +19,32 @@ long compute_something(long iteration_number) {
     return dummy_variable;
 }
 
-void set_affinity_to_cpu(unsigned long cpu_where_set) {
-    long n_processors = sysconf(_SC_NPROCESSORS_ONLN);
-
-    if (cpu_where_set >= n_processors) {
-        printf("Error invalid cpu for affinity \n");
-    } else {
-        cpu_set_t mask;
-        CPU_ZERO(&mask);
-        CPU_SET(cpu_where_set, &mask);
-
-        if (sched_setaffinity(0, sizeof(cpu_set_t), &mask) == -1) {
-            printf("Error on setting cpu affinity \n");
-        }
-    }
-}
-
 int main() {
     long iteration_number = 10000000000L;
 
-    set_affinity_to_cpu(3);
+    struct measure_system_request initial_measures;
+    struct usage_statics final_statics;
 
-    double start_t = clock();
+    int start_measure_error = start_measure_system(3, &initial_measures);
+
+    if (start_measure_error == -1) {
+        printf("Error on start measure\n");
+    }
 
     long dummy_result = compute_something(iteration_number);
 
-    double end_t = clock();
+    int finish_measure_error = finish_measure_system(&initial_measures, &final_statics);
 
-    double total_t = (double) (end_t - start_t) / CLOCKS_PER_SEC;
-    printf("Total time taken by CPU: %f\n", total_t);
+    if (finish_measure_error == -1) {
+        printf("Error on finish measure\n");
+    }
 
+    double total_time = (double) final_statics.elapsed_clock / CLOCKS_PER_SEC;
 
-    print_system_usage();
+    printf("Statics -> Elapsed time: %lf, User time: %li seconds and %li microseconds, system time: %li seconds and %li microseconds, involuntary context switches: %li, voluntary context switches: %li\n",
+           total_time, final_statics.user_time_s, final_statics.user_time_ms, final_statics.system_time_s,
+           final_statics.system_time_ms, final_statics.involuntary_context_switches,
+           final_statics.voluntary_context_switches);
 
     printf("Dummy print: %ld\n", dummy_result);
 
