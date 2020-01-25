@@ -7,6 +7,7 @@
 #include <sys/resource.h>
 #include <sched.h>
 #include <unistd.h>
+#include <time.h>
 
 void print_system_usage() {
     struct rusage usage;
@@ -63,7 +64,16 @@ int main() {
 
     set_affinity_to_cpu(3);
 
+    double start_t = clock();
+
     long dummy_result = compute_something(iteration_number);
+
+    double end_t = clock();
+
+    double total_t = (double) (end_t - start_t) / CLOCKS_PER_SEC;
+    printf("Total time taken by CPU: %f\n", total_t);
+
+
     print_system_usage();
 
     printf("Dummy print: %ld\n", dummy_result);
